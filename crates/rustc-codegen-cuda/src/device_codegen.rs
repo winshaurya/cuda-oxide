@@ -430,7 +430,12 @@ pub fn generate_device_code<'tcx>(
 
         // Check for LTOIR mode (set by cargo oxide --dlto)
         let emit_ltoir = std::env::var("CUDA_OXIDE_EMIT_LTOIR").is_ok();
-        let ltoir_arch = std::env::var("CUDA_OXIDE_ARCH").unwrap_or_else(|_| "sm_100".to_string());
+        let ltoir_arch = std::env::var("CUDA_OXIDE_ARCH").unwrap_or_else(|_| {
+            if emit_ltoir {
+                tcx.dcx().warn("CUDA_OXIDE_ARCH environment variable is not set. Defaulting LTOIR architecture to 'sm_100'.");
+            }
+            "sm_100".to_string()
+        });
         // Check for NVVM IR mode (set by cargo oxide --emit-nvvm-ir)
         let emit_nvvm_ir = std::env::var("CUDA_OXIDE_EMIT_NVVM_IR").is_ok();
 
