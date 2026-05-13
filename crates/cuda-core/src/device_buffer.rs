@@ -283,4 +283,53 @@ impl<T: DeviceCopy> DeviceBuffer<T> {
         }
         stream.synchronize()
     }
+
+    /// Copies contents from an existing host slice into the device buffer.
+    ///
+    /// Symmetrically to [`copy_to_host`], this overwrites the device buffer's
+    /// memory with data from the host. Synchronizes on `stream` before returning
+    /// to ensure the host slice is not inadvertently modified or deallocated
+    /// while the GPU read is in flight. Panics if `src.len() > self.len()`.
+    pub fn copy_from_host(&self, stream: &CudaStream, src: &[T]) -> Result<(), DriverError> {
+        assert!(
+            src.len() <= self.len,
+            "source slice too large: {} > {}",
+            src.len(),
+            self.len
+        );
+        let num_bytes = src.len() * std::mem::size_of::<T>();
+        unsafe {
+            crate::memory::memcpy_htod_async(
+                self.ptr,
+                src.as_ptr(),
+                num_bytes,
+                stream.cu_stream(),
+            )?;
+        }
+        stream.synchronize()
+    }
+
+    /// Copies contents from another device buffer into this device buffer.
+    ///
+    /// Both buffers must reside in contexts accessible to each other (or the same
+    /// context), and the transfer is enqueued asynchronously on `stream`. Since
+    /// both allocations are device-managed, host synchronization is not required.
+    /// Panics if `src.len() > self.len()`.
+    pub fn copy_from_device(
+        &self,
+        stream: &CudaStream,
+        src: &DeviceBuffer<T>,
+    ) -> Result<(), DriverError> {
+        assert!(
+            src.len() <= self.len,
+            "source device buffer too large: {} > {}",
+            src.len(),
+            self.len
+        );
+        let num_bytes = src.len() * std::mem::size_of::<T>();
+        unsafe {
+            crate::memory::memcpy_dtod_async(self.ptr, src.ptr, num_bytes, stream.cu_stream())?;
+        }
+        Ok(())
+    }
 }

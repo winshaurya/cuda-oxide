@@ -153,4 +153,15 @@ impl<DType: Send + Sized> DeviceBox<[DType]> {
             dptr: self.cudptr,
         }
     }
+
+    /// Consumes the `DeviceBox`, returning the raw device pointer, element count,
+    /// and device ordinal without freeing the underlying memory.
+    ///
+    /// Symmetrically to [`from_raw_parts`], the caller becomes responsible for
+    /// ensuring the memory is eventually freed correctly.
+    pub fn into_raw_parts(self) -> (CUdeviceptr, usize, usize) {
+        let parts = (self.cudptr, self.len, self.device_id);
+        std::mem::forget(self);
+        parts
+    }
 }
